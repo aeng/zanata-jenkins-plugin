@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import javax.servlet.ServletException;
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
 
 import org.jenkinsci.remoting.RoleChecker;
 import org.kohsuke.stapler.DataBoundConstructor;
@@ -11,6 +13,7 @@ import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 import org.zanata.cli.SyncJobDetail;
 import org.zanata.cli.service.impl.ZanataSyncServiceImpl;
+import com.google.common.base.Strings;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
@@ -36,7 +39,7 @@ import net.sf.json.JSONObject;
  * to remember the configuration.
  *
  * <p>
- * When a build is performed, the {@link #perform} method will be invoked. 
+ * When a build is performed, the {@link #perform} method will be invoked.
  *
  * @author Kohsuke Kawaguchi
  */
@@ -132,47 +135,57 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
 
         ZanataSyncServiceImpl service =
                 new ZanataSyncServiceImpl(syncJobDetail);
-        if (pushToZanata) {
-            try {
-                workspace.act(new FilePath.FileCallable<Void>() {
-                    @Override
-                    public Void invoke(File f, VirtualChannel channel)
-                            throws IOException, InterruptedException {
-                        service.pushToZanata(f.toPath());
-                        return null;
-                    }
 
-                    @Override
-                    public void checkRoles(RoleChecker roleChecker)
-                            throws SecurityException {
-                    }
-                });
-            } catch (IOException | InterruptedException e) {
-                logger(listener).println("push to zanata failed:" + e.getMessage());
-                throw new RuntimeException(e);
+
+        try {
+            if (pushToZanata) {
+                pushToZanata(workspace, service);
             }
-        }
-        if (pullFromZanata) {
-            try {
-                workspace.act(new FilePath.FileCallable<Void>() {
-
-                    @Override
-                    public Void invoke(File f, VirtualChannel channel)
-                            throws IOException, InterruptedException {
-                        service.pushToZanata(f.toPath());
-                        return null;
-                    }
-
-                    @Override
-                    public void checkRoles(RoleChecker roleChecker)
-                            throws SecurityException {
-                    }
-                });
-            } catch (IOException | InterruptedException e) {
-                logger(listener).println("pull from zanata failed:" + e.getMessage());
-                throw new RuntimeException(e);
+            if (pullFromZanata) {
+                pullFromZanata(workspace, service);
             }
+        } catch (IOException | InterruptedException e) {
+            logger(listener).println("push to zanata failed:" + e.getMessage());
+            throw new RuntimeException(e);
         }
+    }
+
+    private static void pullFromZanata(FilePath workspace,
+            final ZanataSyncServiceImpl service)
+            throws IOException, InterruptedException {
+        workspace.act(new FilePath.FileCallable<Void>() {
+
+            @Override
+            public Void invoke(File f, VirtualChannel channel)
+                    throws IOException, InterruptedException {
+                service.pullFromZanata(f.toPath());
+                return null;
+            }
+
+            @Override
+            public void checkRoles(RoleChecker roleChecker)
+                    throws SecurityException {
+            }
+        });
+    }
+
+    private static void pushToZanata(FilePath workspace,
+            final ZanataSyncServiceImpl service)
+            throws IOException, InterruptedException {
+        workspace.act(new FilePath.FileCallable<Void>() {
+            @Override
+            public Void invoke(File f, VirtualChannel channel)
+                    throws IOException, InterruptedException {
+
+                service.pushToZanata(f.toPath());
+                return null;
+            }
+
+            @Override
+            public void checkRoles(RoleChecker roleChecker)
+                    throws SecurityException {
+            }
+        });
     }
 
     private static PrintStream logger(TaskListener listener) {
@@ -207,7 +220,7 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
 //        private boolean useFrench;
 
         /**
-         * In order to load the persisted global configuration, you have to 
+         * In order to load the persisted global configuration, you have to
          * call load() in the constructor.
          */
         public DescriptorImpl() {
@@ -227,7 +240,7 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
          *      <p>
          *      Note that returning {@link FormValidation#error(String)} does not
          *      prevent the form from being saved. It just means that a message
-         *      will be displayed to the user. 
+         *      will be displayed to the user.
          */
         public FormValidation doCheckZanataURL(@QueryParameter String value)
                 throws IOException, ServletException {
@@ -242,7 +255,7 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
         }
 
         public boolean isApplicable(Class<? extends AbstractProject> aClass) {
-            // Indicates that this builder can be used with all kinds of project types 
+            // Indicates that this builder can be used with all kinds of project types
             return true;
         }
 
