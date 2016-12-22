@@ -22,17 +22,58 @@ package org.zanata.cli.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.xml.bind.JAXBException;
 
-import org.apache.commons.configuration.ConfigurationException;
+import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
+import org.jboss.resteasy.plugins.interceptors.CacheControlFeature;
+import org.jboss.resteasy.plugins.interceptors.encoding.AcceptEncodingGZIPFilter;
+import org.jboss.resteasy.plugins.interceptors.encoding.AcceptEncodingGZIPInterceptor;
+import org.jboss.resteasy.plugins.interceptors.encoding.ClientContentEncodingAnnotationFeature;
+import org.jboss.resteasy.plugins.interceptors.encoding.GZIPDecodingInterceptor;
+import org.jboss.resteasy.plugins.interceptors.encoding.GZIPEncodingInterceptor;
+import org.jboss.resteasy.plugins.interceptors.encoding.ServerContentEncodingAnnotationFeature;
+import org.jboss.resteasy.plugins.providers.ByteArrayProvider;
+import org.jboss.resteasy.plugins.providers.DataSourceProvider;
+import org.jboss.resteasy.plugins.providers.DefaultTextPlain;
+import org.jboss.resteasy.plugins.providers.DocumentProvider;
+import org.jboss.resteasy.plugins.providers.FileProvider;
+import org.jboss.resteasy.plugins.providers.FileRangeWriter;
+import org.jboss.resteasy.plugins.providers.FormUrlEncodedProvider;
+import org.jboss.resteasy.plugins.providers.IIOImageProvider;
+import org.jboss.resteasy.plugins.providers.InputStreamProvider;
+import org.jboss.resteasy.plugins.providers.JaxrsFormProvider;
+import org.jboss.resteasy.plugins.providers.ReaderProvider;
+import org.jboss.resteasy.plugins.providers.SerializableProvider;
+import org.jboss.resteasy.plugins.providers.SourceProvider;
+import org.jboss.resteasy.plugins.providers.StreamingOutputProvider;
+import org.jboss.resteasy.plugins.providers.StringTextStar;
+import org.jboss.resteasy.plugins.providers.jackson.ResteasyJacksonProvider;
+import org.jboss.resteasy.plugins.providers.jaxb.CollectionProvider;
+import org.jboss.resteasy.plugins.providers.jaxb.JAXBElementProvider;
+import org.jboss.resteasy.plugins.providers.jaxb.JAXBXmlRootElementProvider;
+import org.jboss.resteasy.plugins.providers.jaxb.JAXBXmlSeeAlsoProvider;
+import org.jboss.resteasy.plugins.providers.jaxb.JAXBXmlTypeProvider;
+import org.jboss.resteasy.plugins.providers.jaxb.MapProvider;
+import org.jboss.resteasy.plugins.providers.jaxb.XmlJAXBContextFinder;
 import org.zanata.client.commands.OptionsUtil;
 import org.zanata.client.commands.PushPullOptions;
+import org.zanata.client.commands.pull.PullCommand;
+import org.zanata.client.commands.pull.PullOptions;
+import org.zanata.client.commands.push.PushCommand;
+import org.zanata.client.commands.push.PushOptions;
+import org.zanata.client.config.ZanataConfig;
 import org.zanata.exception.ZanataSyncException;
+import org.zanata.rest.client.RestClientFactory;
+import org.zanata.rest.dto.VersionInfo;
 
 /**
  * @author Patrick Huang <a href="mailto:pahuang@redhat.com">pahuang@redhat.com</a>
@@ -40,6 +81,41 @@ import org.zanata.exception.ZanataSyncException;
 public final class PushPullOptionsUtil {
     // TODO make this configurable?
     public static final int MAX_DEPTH = 10;
+
+    // FIXME this is a quick hack to work around http://stackoverflow.com/questions/41253028/how-to-make-jenkins-plugin-aware-of-spi
+    private static final Consumer<ResteasyClientBuilder>
+            resteasyClientBuilderConsumer = builder -> {
+        builder.register(ResteasyJacksonProvider.class)
+                .register(JAXBXmlSeeAlsoProvider.class)
+                .register(JAXBXmlRootElementProvider.class)
+                .register(JAXBElementProvider.class)
+                .register(JAXBXmlTypeProvider.class)
+                .register(CollectionProvider.class)
+                .register(MapProvider.class)
+                .register(XmlJAXBContextFinder.class)
+                .register(DataSourceProvider.class)
+                .register(DocumentProvider.class)
+                .register(DefaultTextPlain.class)
+                .register(StringTextStar.class)
+                .register(SourceProvider.class)
+                .register(InputStreamProvider.class)
+                .register(ReaderProvider.class)
+                .register(ByteArrayProvider.class)
+                .register(FormUrlEncodedProvider.class)
+                .register(JaxrsFormProvider.class)
+                .register(FileProvider.class)
+                .register(FileRangeWriter.class)
+                .register(StreamingOutputProvider.class)
+                .register(IIOImageProvider.class)
+                .register(SerializableProvider.class)
+                .register(CacheControlFeature.class)
+                .register(AcceptEncodingGZIPInterceptor.class)
+                .register(AcceptEncodingGZIPFilter.class)
+                .register(ClientContentEncodingAnnotationFeature.class)
+                .register(GZIPDecodingInterceptor.class)
+                .register(GZIPEncodingInterceptor.class)
+                .register(ServerContentEncodingAnnotationFeature.class);
+    };
 
     /**
      * You typically call this after clone the source repo and before doing a
@@ -64,7 +140,12 @@ public final class PushPullOptionsUtil {
             options.setProjectVersion(null);
             options.setProjectType(null);
 
-            OptionsUtil.applyConfigFiles(options);
+            // here we must take it step by step due to an issue http://stackoverflow.com/questions/41253028/how-to-make-jenkins-plugin-aware-of-spi
+            Optional<ZanataConfig> zanataConfig =
+                    OptionsUtil.applyProjectConfigToProjectOptions(options);
+            if (OptionsUtil.shouldFetchLocalesFromServer(zanataConfig, options)) {
+                OptionsUtil.fetchLocalesFromServer(options, makeRestClientFactory(options));
+            }
 
             File baseDir = projectConfig.getParentFile();
             // we need to adjust src-dir and trans-dir to be relative to zanata base dir
@@ -79,10 +160,28 @@ public final class PushPullOptionsUtil {
                 throw new ZanataSyncException(
                         "Commandhook in zanata.xml is not supported", null);
             }
-        } catch (ConfigurationException | JAXBException e) {
+        } catch (JAXBException e) {
             throw new ZanataSyncException("Failed applying project config", e);
         }
         return options;
+    }
+
+    private static <O extends PushPullOptions> RestClientFactory makeRestClientFactory(
+            O options) {
+        // FIXME the version info is not resolved properly
+        return new RestClientFactory(getUri(options), options.getUsername(),
+                        options.getKey(),
+                        new VersionInfo("unknown", "unknown", "unknown"),
+                        options.getLogHttp(), options.isDisableSSLCert(),
+                        resteasyClientBuilderConsumer);
+    }
+
+    private static <O extends PushPullOptions> URI getUri(O options) {
+        try {
+            return options.getUrl().toURI();
+        } catch (URISyntaxException e) {
+            throw new ZanataSyncException("fail reading zanata base URI");
+        }
     }
 
     /**
@@ -101,5 +200,18 @@ public final class PushPullOptionsUtil {
         } catch (IOException e) {
             throw new ZanataSyncException("Failed finding project config", e);
         }
+    }
+
+    public static PushCommand makePushCommand(PushOptions pushOptions) {
+        RestClientFactory factory =
+                makeRestClientFactory(pushOptions);
+        return new PushCommand(pushOptions, factory.getCopyTransClient(),
+                factory.getAsyncProcessClient(), factory);
+    }
+
+    public static PullCommand makePullCommand(PullOptions pullOptions) {
+        RestClientFactory factory =
+                makeRestClientFactory(pullOptions);
+        return new PullCommand(pullOptions, factory);
     }
 }

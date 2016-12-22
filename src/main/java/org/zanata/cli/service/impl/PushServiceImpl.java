@@ -20,18 +20,11 @@
  */
 package org.zanata.cli.service.impl;
 
-import java.util.List;
-
 import org.zanata.cli.PushService;
-import org.zanata.client.commands.OptionsUtil;
+import org.zanata.cli.util.PushPullOptionsUtil;
 import org.zanata.client.commands.push.PushCommand;
 import org.zanata.client.commands.push.PushOptions;
-import org.zanata.client.config.LocaleList;
-import org.zanata.client.config.LocaleMapping;
 import org.zanata.exception.ZanataSyncException;
-import org.zanata.rest.client.ProjectIterationLocalesClient;
-import org.zanata.rest.client.RestClientFactory;
-import org.zanata.rest.dto.LocaleDetails;
 
 /**
  * @author Patrick Huang <a href="mailto:pahuang@redhat.com">pahuang@redhat.com</a>
@@ -39,9 +32,7 @@ import org.zanata.rest.dto.LocaleDetails;
 public class PushServiceImpl implements PushService {
 
     public void pushToZanata(PushOptions pushOptions) {
-        LocaleList localesList = getLocalesFromServer(pushOptions);
-        pushOptions.setLocaleMapList(localesList);
-        PushCommand pushCommand = new PushCommand(pushOptions);
+        PushCommand pushCommand = PushPullOptionsUtil.makePushCommand(pushOptions);
         try {
             pushCommand.run();
         } catch (Exception e) {
@@ -49,18 +40,4 @@ public class PushServiceImpl implements PushService {
         }
     }
 
-    // TODO open up OptionsUtil method to public so that we can reuse it here
-    private LocaleList getLocalesFromServer(PushOptions pushOptions) {
-        RestClientFactory restClientFactory =
-                OptionsUtil.createClientFactoryWithoutVersionCheck(pushOptions);
-        ProjectIterationLocalesClient projectLocalesClient = restClientFactory
-                .getProjectLocalesClient(pushOptions.getProj(),
-                        pushOptions.getProjectVersion());
-        List<LocaleDetails> locales = projectLocalesClient.getLocales();
-        LocaleList localesList = new LocaleList();
-        for (LocaleDetails details : locales) {
-            localesList.add(new LocaleMapping(details.getLocaleId().getId(), details.getAlias()));
-        }
-        return localesList;
-    }
 }

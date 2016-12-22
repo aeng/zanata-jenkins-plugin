@@ -21,6 +21,7 @@
 package org.zanata.cli.service.impl;
 
 import org.zanata.cli.PullService;
+import org.zanata.cli.util.PushPullOptionsUtil;
 import org.zanata.client.commands.pull.PullCommand;
 import org.zanata.client.commands.pull.PullOptions;
 import org.zanata.exception.ZanataSyncException;
@@ -32,7 +33,7 @@ public class PullServiceImpl implements PullService {
 
     @Override
     public void pullFromZanata(PullOptions pullOptions) {
-        PullCommand pullCommand = new PullCommand(pullOptions);
+        PullCommand pullCommand = PushPullOptionsUtil.makePullCommand(pullOptions);
         try {
             pullCommand.run();
         } catch (Exception e) {
