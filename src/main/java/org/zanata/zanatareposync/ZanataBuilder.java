@@ -3,17 +3,18 @@ package org.zanata.zanatareposync;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.logging.Handler;
 import javax.servlet.ServletException;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
 
 import org.jenkinsci.remoting.RoleChecker;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.zanata.cli.SyncJobDetail;
 import org.zanata.cli.service.impl.ZanataSyncServiceImpl;
-import com.google.common.base.Strings;
+
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
@@ -44,6 +45,8 @@ import net.sf.json.JSONObject;
  * @author Kohsuke Kawaguchi
  */
 public class ZanataBuilder extends Builder implements SimpleBuildStep {
+    private static final Logger log =
+            LoggerFactory.getLogger(ZanataBuilder.class);
 
     private final String zanataURL;
     private final String zanataUsername;
@@ -114,12 +117,8 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
     @Override
     public void perform(Run<?,?> build, FilePath workspace, Launcher launcher, TaskListener listener) {
         // This is where you 'build' the project.
-        // Since this is a dummy, we just say 'hello world' and call that a build.
+        Handler logHandler = configLogger(listener.getLogger());
 
-        // This also shows how you can consult the global configuration of the builder
-//        if (getDescriptor().getUseFrench())
-//            listener.getLogger().println("Bonjour, "+ zanataCLIVersion +"!");
-//        else
         logger(listener).println("Running Zanata sync for "+ zanataURL +"!");
         SyncJobDetail syncJobDetail = SyncJobDetail.Builder.builder()
                 .setZanataUrl(zanataURL)
@@ -147,7 +146,24 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
         } catch (IOException | InterruptedException e) {
             logger(listener).println("push to zanata failed:" + e.getMessage());
             throw new RuntimeException(e);
+        } finally {
+            removeLogger(logHandler);
         }
+    }
+
+    private static Handler configLogger(PrintStream logger) {
+        java.util.logging.Logger zLogger =
+                java.util.logging.Logger.getLogger("org.zanata");
+        ZanataCLILoggerHandler appender =
+                new ZanataCLILoggerHandler(logger);
+        zLogger.addHandler(appender);
+        return appender;
+    }
+
+    private static void removeLogger(Handler appender) {
+        java.util.logging.Logger zLogger =
+                java.util.logging.Logger.getLogger("org.zanata");
+        zLogger.removeHandler(appender);
     }
 
     private static void pullFromZanata(FilePath workspace,
