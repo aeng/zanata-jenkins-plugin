@@ -1,5 +1,5 @@
 <?jelly escape-by-default='true'?>
-<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form" xmlns:c="/lib/credentials">
   <!--
     This jelly script is used for per-project configuration.
 
@@ -14,11 +14,8 @@
   <f:entry title="Zanata Server URL" field="zanataURL">
     <f:textbox default="https://translate.zanata.org" />
   </f:entry>
-  <f:entry title="Zanata username" field="zanataUsername">
-    <f:textbox />
-  </f:entry>
-  <f:entry title="Zanata API key" field="zanataAPI">
-    <f:textbox />
+  <f:entry title="Zanata Credential" field="zanataCredentialsId">
+    <c:select/>
   </f:entry>
   <f:entry title="Sync Option" field="syncOption" description="push source, translation or both from Git to Zanata">
     <f:textbox />

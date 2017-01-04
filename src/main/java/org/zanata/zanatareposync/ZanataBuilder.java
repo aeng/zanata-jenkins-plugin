@@ -3,10 +3,13 @@ package org.zanata.zanatareposync;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.List;
 import java.util.logging.Handler;
 import javax.servlet.ServletException;
 
+import org.apache.commons.lang.StringUtils;
 import org.jenkinsci.remoting.RoleChecker;
+import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
@@ -15,16 +18,30 @@ import org.slf4j.LoggerFactory;
 import org.zanata.cli.SyncJobDetail;
 import org.zanata.cli.service.impl.ZanataSyncServiceImpl;
 
+import com.cloudbees.plugins.credentials.CredentialsMatcher;
+import com.cloudbees.plugins.credentials.CredentialsMatchers;
+import com.cloudbees.plugins.credentials.CredentialsProvider;
+import com.cloudbees.plugins.credentials.common.IdCredentials;
+import com.cloudbees.plugins.credentials.common.PasswordCredentials;
+import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
+import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
+import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
+import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
+import hudson.Util;
 import hudson.model.AbstractProject;
+import hudson.model.Item;
 import hudson.model.Run;
 import hudson.model.TaskListener;
+import hudson.model.queue.Tasks;
 import hudson.remoting.VirtualChannel;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.FormValidation;
+import hudson.util.ListBoxModel;
+import jenkins.model.Jenkins;
 import jenkins.tasks.SimpleBuildStep;
 import net.sf.json.JSONObject;
 
@@ -49,24 +66,23 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
             LoggerFactory.getLogger(ZanataBuilder.class);
 
     private final String zanataURL;
-    private final String zanataUsername;
-    private final String zanataAPI;
     private final String syncOption;
     private final String zanataProjectConfigs;
     private final String zanataLocaleIds;
     private final String zanataProjectId;
     private final boolean pushToZanata;
     private final boolean pullFromZanata;
+    private final String zanataCredentialsId;
 
     // Fields in config.jelly must match the parameter names in the "DataBoundConstructor"
     @DataBoundConstructor
-    public ZanataBuilder(String zanataURL, String zanataUsername,
-            String zanataAPI, String syncOption, String zanataProjectConfigs,
-            String zanataLocaleIds, String zanataProjectId,
+    public ZanataBuilder(String zanataURL,
+            String zanataCredentialsId, String syncOption,
+            String zanataProjectConfigs, String zanataLocaleIds,
+            String zanataProjectId,
             boolean pushToZanata, boolean pullFromZanata) {
         this.zanataURL = zanataURL;
-        this.zanataUsername = zanataUsername;
-        this.zanataAPI = zanataAPI;
+        this.zanataCredentialsId = zanataCredentialsId;
         this.syncOption = syncOption;
         this.zanataProjectConfigs = zanataProjectConfigs;
         this.zanataLocaleIds = zanataLocaleIds;
@@ -80,14 +96,6 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
      */
     public String getZanataURL() {
         return zanataURL;
-    }
-
-    public String getZanataUsername() {
-        return zanataUsername;
-    }
-
-    public String getZanataAPI() {
-        return zanataAPI;
     }
 
     public String getSyncOption() {
@@ -114,16 +122,29 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
         return pullFromZanata;
     }
 
+    public String getZanataCredentialsId() {
+        return zanataCredentialsId;
+    }
+
     @Override
     public void perform(Run<?,?> build, FilePath workspace, Launcher launcher, TaskListener listener) {
         // This is where you 'build' the project.
         Handler logHandler = configLogger(listener.getLogger());
 
+        // TODO pahuang check credential plugin
+//        Plugin credentialsPlugin = Jenkins.getInstance().getPlugin("credentials-uploader");
+
+        IdCredentials cred = CredentialsProvider.findCredentialById(zanataCredentialsId, IdCredentials.class, build);
+        CredentialsProvider.track(build, cred);
+        StandardUsernameCredentials usernameCredentials = (StandardUsernameCredentials) cred;
+        String apiKey =
+                ((PasswordCredentials) usernameCredentials).getPassword()
+                        .getPlainText();
         logger(listener).println("Running Zanata sync for "+ zanataURL +"!");
         SyncJobDetail syncJobDetail = SyncJobDetail.Builder.builder()
                 .setZanataUrl(zanataURL)
-                .setZanataUsername(zanataUsername)
-                .setZanataSecret(zanataAPI)
+                .setZanataUsername(usernameCredentials.getUsername())
+                .setZanataSecret(apiKey)
                 .setSyncToZanataOption(syncOption)
                 .setProjectConfigs(zanataProjectConfigs)
                 .setLocaleId(zanataLocaleIds)
@@ -245,6 +266,61 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
 
         // ========== FORM validation ===========================================
         // ========== https://wiki.jenkins-ci.org/display/JENKINS/Form+Validation
+
+        // TODO I don't really understand how below method works. It's taken from git-plugin jenkins.plugins.git.GitSCMSource
+        public ListBoxModel doFillZanataCredentialsIdItems(@AncestorInPath
+                AbstractProject context,
+                @QueryParameter String remote,
+                @QueryParameter String credentialsId) {
+            if (context == null && !Jenkins.getActiveInstance().hasPermission(Jenkins.ADMINISTER) ||
+                    context != null && !context.hasPermission(Item.EXTENDED_READ)) {
+                return new StandardListBoxModel().includeCurrentValue(credentialsId);
+            }
+            return new StandardListBoxModel()
+                    .includeEmptyValue()
+                    .includeMatchingAs(
+                            Tasks.getAuthenticationOf(context),
+                            context,
+                            StandardUsernameCredentials.class,
+                            URIRequirementBuilder.fromUri(remote).build(),
+                            CredentialsMatchers
+                                    .instanceOf(StandardUsernamePasswordCredentials.class))
+                    .includeCurrentValue(credentialsId);
+        }
+
+        public FormValidation doCheckZanataCredentialsId(@AncestorInPath AbstractProject context,
+                @QueryParameter String url,
+                @QueryParameter String value) {
+            if (context == null && !Jenkins.getActiveInstance().hasPermission(Jenkins.ADMINISTER) ||
+                    context != null && !context.hasPermission(Item.EXTENDED_READ)) {
+                return FormValidation.ok();
+            }
+
+            value = Util.fixEmptyAndTrim(value);
+            if (value == null) {
+                return FormValidation.ok();
+            }
+
+            url = Util.fixEmptyAndTrim(url);
+            if (url == null) {
+                // not set, can't check
+                return FormValidation.ok();
+            }
+
+            for (ListBoxModel.Option o : CredentialsProvider.listCredentials(
+                    StandardUsernameCredentials.class,
+                    context,
+                    Tasks.getAuthenticationOf(context),
+                    URIRequirementBuilder.fromUri(url).build(),
+                    CredentialsMatchers
+                            .instanceOf(StandardUsernamePasswordCredentials.class))) {
+                if (StringUtils.equals(value, o.value)) {
+                    return FormValidation.ok();
+                }
+            }
+            // no credentials available, can't check
+            return FormValidation.warning("Cannot find any credentials with id " + value);
+        }
 
         /**
          * Performs on-the-fly validation of the form field 'zanataURL'.
