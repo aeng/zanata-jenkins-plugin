@@ -1,4 +1,4 @@
-FROM jenkins:2.19.3
+FROM jenkins:2.32.1
 
 
 # COPY plugins.txt /usr/share/jenkins/plugins.txt
@@ -8,7 +8,7 @@ FROM jenkins:2.19.3
 # RUN /usr/local/bin/plugins.sh /usr/share/jenkins/plugins.txt
 
 
-ENV INIT_PLUGINS="git maven-plugin mailer credentials parameterized-trigger"
+ENV INIT_PLUGINS="git maven-plugin mailer credentials parameterized-trigger" DEBUG_PORT=8989
 
 # copy our own utility scripts. To avoid overriding jenkins provide scripts, we prefix our scripts with z_
 COPY scripts/ /usr/local/bin/
@@ -18,6 +18,8 @@ USER root
 RUN chmod go+x /usr/local/bin/z_*
 
 USER ${user}
+
+#ENV JAVA_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,address=$DEBUG_PORT,server=y,suspend=n"
 
 RUN /usr/local/bin/z_install_plugins.sh ${INIT_PLUGINS}
 
