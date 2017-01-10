@@ -8,6 +8,7 @@ import java.util.logging.Handler;
 import javax.servlet.ServletException;
 
 import org.apache.commons.lang.StringUtils;
+import org.jenkinsci.plugins.gitclient.Git;
 import org.jenkinsci.remoting.RoleChecker;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
@@ -17,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.zanata.cli.SyncJobDetail;
 import org.zanata.cli.service.impl.ZanataSyncServiceImpl;
+import org.zanata.git.GitSyncService;
 
 import com.cloudbees.plugins.credentials.CredentialsMatcher;
 import com.cloudbees.plugins.credentials.CredentialsMatchers;
@@ -27,6 +29,7 @@ import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
 import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
+import hudson.EnvVars;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
@@ -162,10 +165,13 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
                 pushToZanata(workspace, service);
             }
             if (pullFromZanata) {
-                pullFromZanata(workspace, service);
+                Git git =
+                        Git.with(listener, new EnvVars(EnvVars.masterEnvVars));
+                GitSyncService gitSyncService = new GitSyncService(syncJobDetail, git);
+                pullFromZanata(workspace, service, gitSyncService);
             }
         } catch (IOException | InterruptedException e) {
-            logger(listener).println("push to zanata failed:" + e.getMessage());
+            logger(listener).println("Zanata Sync failed:" + e.getMessage());
             throw new RuntimeException(e);
         } finally {
             removeLogger(logHandler);
@@ -188,7 +194,7 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
     }
 
     private static void pullFromZanata(FilePath workspace,
-            final ZanataSyncServiceImpl service)
+            final ZanataSyncServiceImpl service, GitSyncService gitSyncService)
             throws IOException, InterruptedException {
         workspace.act(new FilePath.FileCallable<Void>() {
 
@@ -196,6 +202,7 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
             public Void invoke(File f, VirtualChannel channel)
                     throws IOException, InterruptedException {
                 service.pullFromZanata(f.toPath());
+                gitSyncService.syncTranslationToRepo(f.toPath());
                 return null;
             }
 

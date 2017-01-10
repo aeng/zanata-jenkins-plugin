@@ -64,12 +64,15 @@ import org.jboss.resteasy.plugins.providers.jaxb.JAXBXmlSeeAlsoProvider;
 import org.jboss.resteasy.plugins.providers.jaxb.JAXBXmlTypeProvider;
 import org.jboss.resteasy.plugins.providers.jaxb.MapProvider;
 import org.jboss.resteasy.plugins.providers.jaxb.XmlJAXBContextFinder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.zanata.client.commands.OptionsUtil;
 import org.zanata.client.commands.PushPullOptions;
 import org.zanata.client.commands.pull.PullCommand;
 import org.zanata.client.commands.pull.PullOptions;
 import org.zanata.client.commands.push.PushCommand;
 import org.zanata.client.commands.push.PushOptions;
+import org.zanata.client.config.LocaleList;
 import org.zanata.client.config.ZanataConfig;
 import org.zanata.exception.ZanataSyncException;
 import org.zanata.rest.client.RestClientFactory;
@@ -79,6 +82,8 @@ import org.zanata.rest.dto.VersionInfo;
  * @author Patrick Huang <a href="mailto:pahuang@redhat.com">pahuang@redhat.com</a>
  */
 public final class PushPullOptionsUtil {
+    private static final Logger log =
+            LoggerFactory.getLogger(PushPullOptionsUtil.class);
     // TODO make this configurable?
     public static final int MAX_DEPTH = 10;
 
@@ -131,38 +136,44 @@ public final class PushPullOptionsUtil {
      */
     public static <O extends PushPullOptions> O applyProjectConfig(O options,
             File projectConfig) {
-        try {
-            options.setProjectConfig(projectConfig);
-            // unset previous values so that we can reload them from project config
-            options.setSrcDir(null);
-            options.setTransDir(null);
-            options.setProj(null);
-            options.setProjectVersion(null);
-            options.setProjectType(null);
+        options.setProjectConfig(projectConfig);
+        // unset previous values so that we can reload them from project config
+        options.setSrcDir(null);
+        options.setTransDir(null);
+        options.setProj(null);
+        options.setProjectVersion(null);
+        options.setProjectType(null);
 
+        try {
             // here we must take it step by step due to an issue http://stackoverflow.com/questions/41253028/how-to-make-jenkins-plugin-aware-of-spi
             Optional<ZanataConfig> zanataConfig =
                     OptionsUtil.applyProjectConfigToProjectOptions(options);
-            if (OptionsUtil.shouldFetchLocalesFromServer(zanataConfig, options)) {
-                OptionsUtil.fetchLocalesFromServer(options, makeRestClientFactory(options));
-            }
-
-            File baseDir = projectConfig.getParentFile();
-            // we need to adjust src-dir and trans-dir to be relative to zanata base dir
-            options.setSrcDir(
-                    new File(baseDir, options.getSrcDir() != null ?
-                            options.getSrcDir().getPath() : "."));
-            options.setTransDir(
-                    new File(baseDir, options.getTransDir() != null ?
-                            options.getTransDir().getPath() : "."));
-            //disable commandhook
-            if (!options.getCommandHooks().isEmpty()) {
-                throw new ZanataSyncException(
-                        "Commandhook in zanata.xml is not supported", null);
+            if (OptionsUtil
+                    .shouldFetchLocalesFromServer(zanataConfig, options)) {
+                log.debug("fetching locales from server");
+                LocaleList localeMappings = OptionsUtil
+                        .fetchLocalesFromServer(options,
+                                makeRestClientFactory(options));
+                options.setLocaleMapList(localeMappings);
             }
         } catch (JAXBException e) {
             throw new ZanataSyncException("Failed applying project config", e);
         }
+
+        File baseDir = projectConfig.getParentFile();
+        // we need to adjust src-dir and trans-dir to be relative to zanata base dir
+        options.setSrcDir(
+                new File(baseDir, options.getSrcDir() != null ?
+                        options.getSrcDir().getPath() : "."));
+        options.setTransDir(
+                new File(baseDir, options.getTransDir() != null ?
+                        options.getTransDir().getPath() : "."));
+        // disable commandhook
+        if (!options.getCommandHooks().isEmpty()) {
+            throw new ZanataSyncException(
+                    "Commandhook in zanata.xml is not supported", null);
+        }
+
         return options;
     }
 
