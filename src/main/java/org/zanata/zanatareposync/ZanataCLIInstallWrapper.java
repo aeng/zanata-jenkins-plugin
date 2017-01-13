@@ -17,17 +17,12 @@
 package org.zanata.zanatareposync;
 
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
 import org.kohsuke.stapler.DataBoundConstructor;
-import org.kohsuke.stapler.StaplerRequest;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import hudson.AbortException;
 import hudson.EnvVars;
 import hudson.Extension;
 import hudson.Launcher;
@@ -42,28 +37,19 @@ import hudson.model.Run.RunnerAbortedException;
 import hudson.tasks.BuildWrapper;
 import hudson.tasks.BuildWrapperDescriptor;
 import jenkins.model.Jenkins;
-import net.sf.json.JSONObject;
 
 /**
- * Installs tools selected by the user. Exports configured paths and a home variable for each tool.
+ * Installs Zanata CLI selected by the user. Exports Zanata CLI home directory as variable.
  *
- * @author rcampbell
- * @author Oleg Nenashev
  *
  */
 public class ZanataCLIInstallWrapper extends BuildWrapper {
 
-    /**
-     * Ceremony needed to satisfy NoStaplerConstructionException:
-     * "There's no @DataBoundConstructor on any constructor of class java.lang.String"
-     * @author rcampbell
-     *
-     */
-    public static class SelectedTool {
+    public static class SelectedCLI {
         private final String name;
 
         @DataBoundConstructor
-        public SelectedTool(String name) {
+        public SelectedCLI(String name) {
             this.name = name;
         }
 
@@ -76,12 +62,12 @@ public class ZanataCLIInstallWrapper extends BuildWrapper {
             return name;
         }
 
-        public @CheckForNull ZanataCLIInstall toCustomTool() {
+        public @CheckForNull ZanataCLIInstall toZanataCLIInstall() {
             return ((ZanataCLIInstall.DescriptorImpl) Jenkins.getActiveInstance().getDescriptor(ZanataCLIInstall.class)).byName(name);
         }
 
         public @Nonnull ZanataCLIInstall toCustomToolValidated() {
-            ZanataCLIInstall tool = toCustomTool();
+            ZanataCLIInstall tool = toZanataCLIInstall();
             if (tool == null) {
                 throw new RuntimeException("Can not find Zanata CLI. Has it been deleted in global configuration?");
             }
@@ -89,17 +75,22 @@ public class ZanataCLIInstallWrapper extends BuildWrapper {
         }
     }
 
-    private @Nonnull SelectedTool[] selectedTools = new SelectedTool[0];
+    private @Nonnull SelectedCLI[] selectedCLIs = new SelectedCLI[0];
     private final boolean convertHomesToUppercase;
 
     @DataBoundConstructor
-    public ZanataCLIInstallWrapper(SelectedTool[] selectedTools, boolean convertHomesToUppercase) {
-        this.selectedTools = (selectedTools != null) ? selectedTools : new SelectedTool[0];
+    public ZanataCLIInstallWrapper(SelectedCLI[] selectedCLIs, boolean convertHomesToUppercase) {
+        this.selectedCLIs = (selectedCLIs != null) ?
+                selectedCLIs : new SelectedCLI[0];
         this.convertHomesToUppercase = convertHomesToUppercase;
     }
 
     public boolean isConvertHomesToUppercase() {
         return convertHomesToUppercase;
+    }
+
+    public @Nonnull SelectedCLI[] getSelectedCLIs() {
+        return selectedCLIs.clone();
     }
 
     @Override
@@ -113,27 +104,19 @@ public class ZanataCLIInstallWrapper extends BuildWrapper {
             @Override
             public void buildEnvVars(Map<String, String> env) {
 
-                // TODO: Inject Home dirs as well
-                for (SelectedTool selectedTool : selectedTools) {
-                    ZanataCLIInstall tool = selectedTool.toCustomTool();
-                    if (tool != null /*&& tool.hasVersions()*/) {
-//                        ToolVersion version = ToolVersion.getEffectiveToolVersion(tool, buildEnv, node);
-//                        if (version != null && !env.containsKey(version.getVariableName())) {
-//                            env.put(version.getVariableName(), version.getDefaultVersion());
-//                        }
+                for (SelectedCLI selectedTool : selectedCLIs) {
+                    ZanataCLIInstall tool = selectedTool.toZanataCLIInstall();
+                    if (tool != null) {
+                        logMessage(listener, "version " + tool.getVersion() + " will be installed " + node.getDisplayName());
                     }
                 }
             }
         };
     }
 
-    public @Nonnull SelectedTool[] getSelectedTools() {
-        return selectedTools.clone();
-    }
-
     /**
-     * The heart of the beast. Installs selected tools and exports their paths to the
-     * PATH and their HOMEs as environment variables.
+     * The heart of the beast. Installs selected zanata CLIs and exports their
+     * HOMEs as environment variables.
      * @return A decorated launcher
      */
     @Override
@@ -143,10 +126,6 @@ public class ZanataCLIInstallWrapper extends BuildWrapper {
 
         EnvVars buildEnv = build.getEnvironment(listener);
         final EnvVars homes = new EnvVars();
-        final EnvVars versions = new EnvVars();
-
-//        final PathsList paths = new PathsList();
-//        final List<EnvVariablesInjector> additionalVarInjectors = new LinkedList<EnvVariablesInjector>();
 
         // Each tool can export zero or many directories to the PATH
         final Node node =  Computer.currentComputer().getNode();
@@ -154,39 +133,14 @@ public class ZanataCLIInstallWrapper extends BuildWrapper {
             throw new RuntimeException("Cannot install tools on the deleted node");
         }
 
-        for (SelectedTool selectedToolName : selectedTools) {
-            ZanataCLIInstall tool = selectedToolName.toCustomToolValidated();
+        for (SelectedCLI selectedCLIName : selectedCLIs) {
+            ZanataCLIInstall tool = selectedCLIName.toCustomToolValidated();
             logMessage(listener, "Starting installation");
-
-            // Check versioning
-//            checkVersions(tool, listener, buildEnv, node, versions);
 
             // This installs the tool if necessary
             ZanataCLIInstall installed = tool
                     .forNode(node, listener);
 
-            // Handle global options of the tool
-            //TODO: convert to label specifics?
-//            final PathsList installedPaths = installed.getPaths(node);
-//            installed.correctHome(installedPaths);
-//            paths.add(installedPaths);
-//            final String additionalVars = installed.getAdditionalVariables();
-//            if (additionalVars != null) {
-//                additionalVarInjectors.add(EnvVariablesInjector.create(additionalVars));
-//            }
-
-            // Handle label-specific options of the tool
-            for (LabelSpecifics spec : installed.getLabelSpecifics()) {
-                if (!spec.appliesTo(node)) {
-                    continue;
-                }
-                logMessage(listener, "Label specifics from '" + spec.getLabel() + "' will be applied");
-
-//                final String additionalLabelSpecificVars = spec.getAdditionalVars();
-//                if (additionalLabelSpecificVars != null) {
-//                    additionalVarInjectors.add(EnvVariablesInjector.create(additionalLabelSpecificVars));
-//                }
-            }
 
             logMessage(listener, "Tool is installed at "+ installed.getHome());
             String homeDirVarName = (convertHomesToUppercase ? installed.getName().toUpperCase(Locale.ENGLISH) : installed.getName()) +"_HOME";
@@ -215,10 +169,7 @@ public class ZanataCLIInstallWrapper extends BuildWrapper {
 
                 // Inject additional variables
                 vars.putAll(homes);
-                vars.putAll(versions);
-//                for (EnvVariablesInjector injector : additionalVarInjectors) {
-//                    injector.Inject(vars);
-//                }
+
 
                 // Override paths to prevent JENKINS-20560
                 if (vars.containsKey("PATH")) {
@@ -244,42 +195,6 @@ public class ZanataCLIInstallWrapper extends BuildWrapper {
     private static void logMessage(BuildListener listener, String message) {
         listener.getLogger().println("[ZANATA-CLI Install] " + message);
     }
-
-    /**
-     * @deprecated The method is deprecated. It will be removed in future versions.
-     */
-    @SuppressFBWarnings(value = "NM_METHOD_NAMING_CONVENTION", justification = "Deprecated, will be removed later")
-    public void CheckVersions (ZanataCLIInstall tool, BuildListener listener, EnvVars buildEnv, Node node, EnvVars target) {
-//        checkVersions(tool, listener, buildEnv, node, target);
-    }
-
-    /**
-     * Checks versions and modify build environment if required.
-     * @since 0.4
-     */
-//    public void checkVersions (@Nonnull ZanataCLIInstall tool, @Nonnull
-//            BuildListener listener,
-//            @Nonnull EnvVars buildEnv, @Nonnull Node node, @Nonnull
-//            EnvVars target) {
-//        // Check version
-//        if (tool.hasVersions()) {
-//            ToolVersion version = ToolVersion.getEffectiveToolVersion(tool, buildEnv, node);
-//            if (version == null) {
-//                CustomToolsLogger.logMessage(listener, tool.getName(), "Error: No version has been specified, no default version. Failing the build...");
-//                throw new CustomToolException("Version has not been specified for the "+tool.getName());
-//            }
-//
-//            CustomToolsLogger.logMessage(listener, tool.getName(), "Version "+version.getActualVersion()+" has been specified by "+version.getVersionSource());
-//
-//            // Override default versions
-//            final String versionSource = version.getVersionSource();
-//            if (versionSource != null && versionSource.equals(ToolVersion.DEFAULTS_SOURCE)) {
-//                String envStr = version.getVariableName()+"="+version.getDefaultVersion();
-//                target.addLine(envStr);
-//                buildEnv.addLine(envStr);
-//            }
-//        }
-//    }
 
     @Override
     public Descriptor<BuildWrapper> getDescriptor() {
