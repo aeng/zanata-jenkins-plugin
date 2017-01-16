@@ -83,6 +83,10 @@ public class GitSyncService implements RepoSyncService {
         try {
             GitClient gitClient =
                     git.in(workingDir.toFile()).using("jgit").getClient();
+            if (!gitClient.hasGitRepo()) {
+                log.warn("no git repository found. Skip git commit step");
+                return;
+            }
             if (log.isDebugEnabled()) {
                 gitClient.withRepository(
                         (RepositoryCallback<Void>) (repo, channel) -> {

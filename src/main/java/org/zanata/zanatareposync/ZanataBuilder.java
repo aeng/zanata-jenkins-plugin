@@ -3,7 +3,6 @@ package org.zanata.zanatareposync;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.List;
 import java.util.logging.Handler;
 import javax.servlet.ServletException;
 
@@ -19,8 +18,6 @@ import org.slf4j.LoggerFactory;
 import org.zanata.cli.SyncJobDetail;
 import org.zanata.cli.service.impl.ZanataSyncServiceImpl;
 import org.zanata.git.GitSyncService;
-
-import com.cloudbees.plugins.credentials.CredentialsMatcher;
 import com.cloudbees.plugins.credentials.CredentialsMatchers;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.common.IdCredentials;
@@ -29,6 +26,7 @@ import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
 import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
+import hudson.AbortException;
 import hudson.EnvVars;
 import hudson.Extension;
 import hudson.FilePath;
@@ -130,7 +128,8 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
     }
 
     @Override
-    public void perform(Run<?,?> build, FilePath workspace, Launcher launcher, TaskListener listener) {
+    public void perform(Run<?,?> build, FilePath workspace, Launcher launcher, TaskListener listener)
+            throws IOException {
         // This is where you 'build' the project.
         Handler logHandler = configLogger(listener.getLogger());
 
@@ -138,6 +137,9 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
 //        Plugin credentialsPlugin = Jenkins.getInstance().getPlugin("credentials-uploader");
 
         IdCredentials cred = CredentialsProvider.findCredentialById(zanataCredentialsId, IdCredentials.class, build);
+        if (cred == null) {
+            throw new AbortException("Zanata credential with ID [" + zanataCredentialsId + "] can not be found.");
+        }
         CredentialsProvider.track(build, cred);
         StandardUsernameCredentials usernameCredentials = (StandardUsernameCredentials) cred;
         String apiKey =
