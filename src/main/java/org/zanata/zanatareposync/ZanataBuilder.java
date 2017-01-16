@@ -70,7 +70,6 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
     private final String syncOption;
     private final String zanataProjectConfigs;
     private final String zanataLocaleIds;
-    private final String zanataProjectId;
     private final boolean pushToZanata;
     private final boolean pullFromZanata;
     private final String zanataCredentialsId;
@@ -80,14 +79,12 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
     public ZanataBuilder(String zanataURL,
             String zanataCredentialsId, String syncOption,
             String zanataProjectConfigs, String zanataLocaleIds,
-            String zanataProjectId,
             boolean pushToZanata, boolean pullFromZanata) {
         this.zanataURL = zanataURL;
         this.zanataCredentialsId = zanataCredentialsId;
         this.syncOption = syncOption;
         this.zanataProjectConfigs = zanataProjectConfigs;
         this.zanataLocaleIds = zanataLocaleIds;
-        this.zanataProjectId = zanataProjectId;
         this.pushToZanata = pushToZanata;
         this.pullFromZanata = pullFromZanata;
     }
@@ -109,10 +106,6 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
 
     public String getZanataLocaleIds() {
         return zanataLocaleIds;
-    }
-
-    public String getZanataProjectId() {
-        return zanataProjectId;
     }
 
     public boolean isPushToZanata() {
@@ -153,7 +146,6 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
                 .setSyncToZanataOption(syncOption)
                 .setProjectConfigs(zanataProjectConfigs)
                 .setLocaleId(zanataLocaleIds)
-                .setProject(zanataProjectId)
                 .build();
 
         logger(listener).println("Job config: " + syncJobDetail.toString());

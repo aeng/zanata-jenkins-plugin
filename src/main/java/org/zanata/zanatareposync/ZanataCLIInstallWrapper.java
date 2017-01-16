@@ -79,7 +79,7 @@ public class ZanataCLIInstallWrapper extends BuildWrapper {
     private final boolean convertHomesToUppercase;
 
     @DataBoundConstructor
-    public ZanataCLIInstallWrapper(SelectedCLI[] selectedCLIs, boolean convertHomesToUppercase) {
+    public ZanataCLIInstallWrapper(SelectedCLI[] selectedCLIs, boolean convertHomesToUppercase, String zanataCLIInstall) {
         this.selectedCLIs = (selectedCLIs != null) ?
                 selectedCLIs : new SelectedCLI[0];
         this.convertHomesToUppercase = convertHomesToUppercase;

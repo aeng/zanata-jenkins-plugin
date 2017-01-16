@@ -26,9 +26,6 @@
   <f:entry title="Locale IDs" field="zanataLocaleIds">
     <f:textbox />
   </f:entry>
-  <f:entry title="Project ID" field="zanataProjectId">
-    <f:textbox />
-  </f:entry>
   <f:entry title="Push to Zanata" field="pushToZanata">
     <f:checkbox />
   </f:entry>
