@@ -3,7 +3,10 @@ package org.zanata.zanatareposync;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.logging.Handler;
+import javax.annotation.CheckForNull;
 import javax.servlet.ServletException;
 
 import org.apache.commons.lang.StringUtils;
@@ -11,6 +14,7 @@ import org.jenkinsci.plugins.gitclient.Git;
 import org.jenkinsci.remoting.RoleChecker;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 import org.slf4j.Logger;
@@ -22,10 +26,11 @@ import com.cloudbees.plugins.credentials.CredentialsMatchers;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.common.IdCredentials;
 import com.cloudbees.plugins.credentials.common.PasswordCredentials;
-import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
 import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
+import com.cloudbees.plugins.credentials.common.StandardUsernameListBoxModel;
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
+import com.google.common.base.Strings;
 import hudson.AbortException;
 import hudson.EnvVars;
 import hudson.Extension;
@@ -34,6 +39,8 @@ import hudson.Launcher;
 import hudson.Util;
 import hudson.model.AbstractProject;
 import hudson.model.Item;
+import hudson.model.Job;
+import hudson.model.Queue;
 import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.model.queue.Tasks;
@@ -66,27 +73,24 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
     private static final Logger log =
             LoggerFactory.getLogger(ZanataBuilder.class);
 
-    private final String zanataURL;
-    private final String syncOption;
-    private final String zanataProjectConfigs;
-    private final String zanataLocaleIds;
-    private final boolean pushToZanata;
-    private final boolean pullFromZanata;
-    private final String zanataCredentialsId;
+    private String zanataURL;
+    private String syncOption;
+    private String zanataProjectConfigs;
+    private String zanataLocaleIds;
+    private boolean pushToZanata;
+    private boolean pullFromZanata;
+    private String zanataCredentialsId;
 
     // Fields in config.jelly must match the parameter names in the "DataBoundConstructor"
     @DataBoundConstructor
-    public ZanataBuilder(String zanataURL,
-            String zanataCredentialsId, String syncOption,
-            String zanataProjectConfigs, String zanataLocaleIds,
-            boolean pushToZanata, boolean pullFromZanata) {
-        this.zanataURL = zanataURL;
+    public ZanataBuilder(String zanataCredentialsId) {
+        this.zanataURL = null;
         this.zanataCredentialsId = zanataCredentialsId;
-        this.syncOption = syncOption;
-        this.zanataProjectConfigs = zanataProjectConfigs;
-        this.zanataLocaleIds = zanataLocaleIds;
-        this.pushToZanata = pushToZanata;
-        this.pullFromZanata = pullFromZanata;
+        this.syncOption = "source";
+        this.zanataProjectConfigs = null;
+        this.zanataLocaleIds = null;
+        this.pushToZanata = true;
+        this.pullFromZanata = true;
     }
 
     /**
@@ -120,8 +124,38 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
         return zanataCredentialsId;
     }
 
+    @DataBoundSetter
+    public void setZanataURL(String zanataURL) {
+        this.zanataURL = zanataURL;
+    }
+
+    @DataBoundSetter
+    public void setSyncOption(String syncOption) {
+        this.syncOption = syncOption;
+    }
+
+    @DataBoundSetter
+    public void setZanataProjectConfigs(String zanataProjectConfigs) {
+        this.zanataProjectConfigs = zanataProjectConfigs;
+    }
+
+    @DataBoundSetter
+    public void setZanataLocaleIds(String zanataLocaleIds) {
+        this.zanataLocaleIds = zanataLocaleIds;
+    }
+
+    @DataBoundSetter
+    public void setPushToZanata(boolean pushToZanata) {
+        this.pushToZanata = pushToZanata;
+    }
+
+    @DataBoundSetter
+    public void setPullFromZanata(boolean pullFromZanata) {
+        this.pullFromZanata = pullFromZanata;
+    }
+
     @Override
-    public void perform(Run<?,?> build, FilePath workspace, Launcher launcher, TaskListener listener)
+    public void perform(Run<?, ?> build, FilePath workspace, Launcher launcher, TaskListener listener)
             throws IOException {
         // This is where you 'build' the project.
         Handler logHandler = configLogger(listener.getLogger());
@@ -249,15 +283,6 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
     @Extension // This indicates to Jenkins that this is an implementation of an extension point.
     public static final class DescriptorImpl extends BuildStepDescriptor<Builder> {
         /**
-         * To persist global configuration information,
-         * simply store it in a field and call save().
-         *
-         * <p>
-         * If you don't want fields to be persisted, use {@code transient}.
-         */
-//        private boolean useFrench;
-
-        /**
          * In order to load the persisted global configuration, you have to
          * call load() in the constructor.
          */
@@ -268,27 +293,40 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
         // ========== FORM validation ===========================================
         // ========== https://wiki.jenkins-ci.org/display/JENKINS/Form+Validation
 
-        // TODO I don't really understand how below method works. It's taken from git-plugin jenkins.plugins.git.GitSCMSource
+        @SuppressWarnings("unused")
         public ListBoxModel doFillZanataCredentialsIdItems(@AncestorInPath
-                AbstractProject context,
+                Job context,
                 @QueryParameter String remote,
                 @QueryParameter String credentialsId) {
-            if (context == null && !Jenkins.getActiveInstance().hasPermission(Jenkins.ADMINISTER) ||
-                    context != null && !context.hasPermission(Item.EXTENDED_READ)) {
-                return new StandardListBoxModel().includeCurrentValue(credentialsId);
+            if (context == null || !context.hasPermission(Item.CONFIGURE)) {
+                // previously it was recommended to just return an empty ListBoxModel
+                // now recommended to return a model with just the current value
+                return new StandardUsernameListBoxModel().includeCurrentValue(credentialsId);
             }
-            return new StandardListBoxModel()
+            // previously it was recommended to use the withXXX methods providing the credentials instances directly
+            // now recommended to populate the model using the includeXXX methods which call through to
+            // CredentialsProvider.listCredentials and to ensure that the current value is always present using
+            // includeCurrentValue
+            return new StandardUsernameListBoxModel()
                     .includeEmptyValue()
-                    .includeMatchingAs(
-                            Tasks.getAuthenticationOf(context),
-                            context,
-                            StandardUsernameCredentials.class,
-                            URIRequirementBuilder.fromUri(remote).build(),
-                            CredentialsMatchers
-                                    .instanceOf(StandardUsernamePasswordCredentials.class))
+                    .includeAs(Tasks.getAuthenticationOf((Queue.Task) context), context, StandardUsernameCredentials.class,
+                            URIRequirementBuilder.fromUri(remote).build())
                     .includeCurrentValue(credentialsId);
         }
 
+        @SuppressWarnings("unused")
+        public ListBoxModel doFillSyncOptionItems(
+                @QueryParameter String selection) {
+            return new ListBoxModel(new ListBoxModel.Option("source", "source",
+                    "source".equals(selection)),
+                    new ListBoxModel.Option("both", "both",
+                            "both".equals(selection)),
+                    new ListBoxModel.Option("trans", "trans",
+                            "trans".equals(selection)));
+
+        }
+
+        @SuppressWarnings("unused")
         public FormValidation doCheckZanataCredentialsId(@AncestorInPath AbstractProject context,
                 @QueryParameter String url,
                 @QueryParameter String value) {
@@ -335,14 +373,15 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
          *      prevent the form from being saved. It just means that a message
          *      will be displayed to the user.
          */
+        @SuppressWarnings("unused")
         public FormValidation doCheckZanataURL(@QueryParameter String value)
                 throws IOException, ServletException {
-            if (value.length() == 0) {
-                return FormValidation.error("Please set a zanata URL");
-            }
-            // TODO check URL
-            if (value.length() < 4) {
-                return FormValidation.warning("Isn't the zanataCLIVersion too short?");
+            if (!Strings.isNullOrEmpty(value) && value.trim().length() > 0) {
+                try {
+                    URL url = new URL(value);
+                } catch (MalformedURLException e) {
+                    return FormValidation.error("Not a valid URL");
+                }
             }
             return FormValidation.ok();
         }
@@ -370,15 +409,6 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
             return super.configure(req,formData);
         }
 
-        /**
-         * This method returns true if the global configuration says we should speak French.
-         *
-         * The method zanataCLIVersion is bit awkward because global.jelly calls this method to determine
-         * the initial state of the checkbox by the naming convention.
-         */
-//        public boolean getUseFrench() {
-//            return useFrench;
-//        }
     }
 }
 

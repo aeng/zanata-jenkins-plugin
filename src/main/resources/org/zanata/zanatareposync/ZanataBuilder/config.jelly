@@ -12,18 +12,18 @@
   -->
 
   <f:entry title="Zanata Server URL" field="zanataURL">
-    <f:textbox default="https://translate.zanata.org" />
+    <f:textbox />
   </f:entry>
   <f:entry title="Zanata Credential" field="zanataCredentialsId">
     <c:select/>
   </f:entry>
   <f:entry title="Sync Option" field="syncOption" description="push source, translation or both from Git to Zanata">
-    <f:textbox />
+    <c:select />
   </f:entry>
   <f:entry title="Zanata project configs" field="zanataProjectConfigs" description="zanata.xml relative path to Git base dir">
     <f:textbox />
   </f:entry>
-  <f:entry title="Locale IDs" field="zanataLocaleIds">
+  <f:entry title="Locale IDs" field="zanataLocaleIds" description="restrict what locale(s) you want to pull. e.g. zh,ja. Leave blank for pulling all locales defined on server">
     <f:textbox />
   </f:entry>
   <f:entry title="Push to Zanata" field="pushToZanata">

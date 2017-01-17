@@ -6,6 +6,7 @@ import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import hudson.EnvVars;
+import hudson.FilePath;
 import hudson.Launcher;
 import hudson.Proc;
 import hudson.model.AbstractBuild;
@@ -22,22 +23,22 @@ public class RunAsCommand {
     private static final Logger log =
             LoggerFactory.getLogger(RunAsCommand.class);
 
-    public boolean run(Launcher launcher, AbstractBuild<?,?> build, TaskListener listener, ArgumentListBuilder args)
+    public boolean run(Run<?,?> build, FilePath workspace, Launcher launcher, TaskListener listener, ArgumentListBuilder args)
             throws InterruptedException {
 
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             EnvVars env = build.getEnvironment(listener);
-            env.putAll(build.getBuildVariables());
+            env.putAll(build.getCharacteristicEnvVars());
 
             log.debug("Environment variables: {}", env.entrySet());
             log.debug("Command line: {}", args.toStringWithQuote());
 
             StreamBuildListener streamBuildListener = new StreamBuildListener(baos);
 
-            final Proc child = launcher.decorateFor(build.getBuiltOn())
+            final Proc child = workspace.createLauncher(listener)
                     .launch()
                     .cmds(args).envs(env).stdout(streamBuildListener)
-                    .pwd(build.getWorkspace())
+                    .pwd(workspace)
                     .start();
 
             try {

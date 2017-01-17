@@ -21,6 +21,7 @@
 package org.zanata.cli.service.impl;
 
 import java.io.File;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -33,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import org.zanata.cli.SyncJobDetail;
 import org.zanata.cli.ZanataSyncService;
 import org.zanata.cli.util.PushPullOptionsUtil;
+import org.zanata.client.commands.PushPullOptions;
 import org.zanata.client.commands.pull.PullOptions;
 import org.zanata.client.commands.pull.PullOptionsImpl;
 import org.zanata.client.commands.push.PushOptions;
@@ -138,7 +140,7 @@ public class ZanataSyncServiceImpl implements ZanataSyncService {
 
     private void pushIfProjectIdMatchesConfig(String project, File config) {
         if (Strings.isNullOrEmpty(project) || Objects.equals(getPushOptions().getProj(), project)) {
-            checkURL(getPushOptions().getUrl(), zanataUrl);
+            overrideURLIfSpecified(getPushOptions(), zanataUrl);
             pushService.pushToZanata(getPushOptions());
         } else if (!Strings.isNullOrEmpty(project)) {
             log.warn(
@@ -147,14 +149,14 @@ public class ZanataSyncServiceImpl implements ZanataSyncService {
         }
     }
 
-    private static void checkURL(URL urlInProjectConfig, String urlFromJobDetail) {
-        if (urlInProjectConfig != null) {
-            // check URL defined in zanata.xml from source repository against the
-            // one from API call (which is defines where the zanata account belongs
-            // to)
-            if (!urlFromJobDetail.equals(urlInProjectConfig.toString())) {
-                log.warn("Using account from [{}] but the repo has zanata.xml using [{}]",
-                        urlFromJobDetail, urlInProjectConfig);
+    private static void overrideURLIfSpecified(PushPullOptions opts,
+            String zanataUrl) {
+        if (!Strings.isNullOrEmpty(zanataUrl)) {
+            try {
+                opts.setUrl(new URL(zanataUrl));
+            } catch (MalformedURLException e) {
+                log.warn("{} is malformed", zanataUrl);
+                throw new IllegalArgumentException(zanataUrl + " is malformed");
             }
         }
     }
@@ -193,7 +195,7 @@ public class ZanataSyncServiceImpl implements ZanataSyncService {
 
     private void pullIfProjectIdMatchesConfig(String project, File config) {
         if (Strings.isNullOrEmpty(project) || Objects.equals(getPushOptions().getProj(), project)) {
-            checkURL(getPushOptions().getUrl(), zanataUrl);
+            overrideURLIfSpecified(getPullOptions(), zanataUrl);
             pullService.pullFromZanata(getPullOptions());
         } else if (!Strings.isNullOrEmpty(project)) {
             log.warn(

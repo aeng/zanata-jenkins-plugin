@@ -8,7 +8,7 @@ FROM jenkins:2.32.1
 # RUN /usr/local/bin/plugins.sh /usr/share/jenkins/plugins.txt
 
 
-ENV INIT_PLUGINS="git maven-plugin mailer credentials parameterized-trigger" DEBUG_PORT=8989
+ENV INIT_PLUGINS="git maven-plugin mailer credentials credentials-binding parameterized-trigger" DEBUG_PORT=8989
 
 # copy our own utility scripts. To avoid overriding jenkins provide scripts, we prefix our scripts with z_
 COPY scripts/ /usr/local/bin/
