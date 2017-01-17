@@ -14,6 +14,8 @@ docker run --rm -p 8080:8080 -p 50000:50000 --name zjen zjenkins/dev
 ```
 
 ### How to use it in pipeline
+
+#### Use standard push and pull
 ```groovy
 node {
     // define common variables
@@ -31,6 +33,21 @@ node {
     withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: gitCredentialsId, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD']]) {
         sh('git push https://${GIT_USERNAME}:${GIT_PASSWORD}@' + ' ' + gitRepo)
     }
+}
+
+```
+
+#### Install tool and run in shell 
+Assuming a Zanata CLI version 4.0.0 is pre-configured (it will generate a tool name 'Zanata_cli_4_0_0').
+```groovy
+node {
+    // from Pipeline Syntax: select 'tool: Use a tool from a predefined Tool Installation' and then generate script
+    tool name: 'Zanana_cli_4_0_0', type: 'org.zanata.zanatareposync.ZanataCLIInstall'
+    
+    withEnv(["CLI_HOME=${ tool 'Zanana_cli_4_0_0' }"]) {
+         sh '$CLI_HOME/bin/zanata-cli help'
+    }
+    
 }
 
 ```
