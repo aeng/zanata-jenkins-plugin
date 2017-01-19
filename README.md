@@ -52,7 +52,7 @@ Assuming a Zanata CLI version 4.0.0 is pre-configured (it will generate a tool n
 ```groovy
 node {
     // from Pipeline Syntax: select 'tool: Use a tool from a predefined Tool Installation' and then generate script
-    tool name: 'zanata_cli_4_0_0', type: 'org.zanata.zanatareposync.ZanataCLIInstall'
+    tool name: 'zanata_cli_4_0_0', type: 'org.jenkinsci.plugins.zanata.zanatareposync.ZanataCLIInstall'
     
     withEnv(["CLI_HOME=${ tool 'zanata_cli_4_0_0' }"]) {
          sh '$CLI_HOME/bin/zanata-cli help'
