@@ -10,7 +10,8 @@
     <relativePath/>
   </parent>
   <groupId>org.zanata</groupId>
-  <artifactId>zanata-repo-sync</artifactId>
+  <!-- artifactId will be the pluginId -->
+  <artifactId>zanata</artifactId>
   <version>1.0-SNAPSHOT</version>
   <packaging>hpi</packaging>
 
@@ -32,28 +33,27 @@
     <workflow.version>1.14</workflow.version>
   </properties>
 
-  <name>ZanataPlugin</name>
-  <description>Zanata Jenkins Plugin</description>
-  <url>https://wiki.jenkins-ci.org/display/JENKINS/Zanata+Jenkins+Plugin</url>
-
-  <!-- The default licence for Jenkins OSS Plugins is MIT. Substitute for the applicable one if needed. -->
+  <!-- this value will be shown in the Jenkins Update Centre -->
+  <name>Zanata and SCM synchronization</name>
+  <description>Jenkins Plugin to synchronize between Zanata and SCM repo</description>
+  <url>https://wiki.jenkins-ci.org/display/JENKINS/Zanata</url>
 
   <licenses>
     <license>
-      <name>MIT License</name>
-      <url>http://opensource.org/licenses/MIT</url>
+      <name>GNU Lesser General Public License v2.1</name>
+      <url>http://www.gnu.org/licenses/lgpl-2.1.html</url>
+      <distribution>repo</distribution>
     </license>
   </licenses>
 
-  <!-- If you want this to appear on the wiki page:
   <developers>
     <developer>
-      <id>bhacker</id>
-      <name>Bob Q. Hacker</name>
-      <email>bhacker@nowhere.net</email>
+      <id>huangp</id>
+      <name>Patrick Huang</name>
+      <email>pahuang@redhat.com</email>
     </developer>
   </developers>
-  -->
+
   <!-- Assuming you want to host on @jenkinsci:
   <scm>
     <connection>scm:git:git://github.com/jenkinsci/${project.artifactId}-plugin.git</connection>
