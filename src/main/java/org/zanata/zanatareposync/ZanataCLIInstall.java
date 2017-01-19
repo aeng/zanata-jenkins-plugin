@@ -17,13 +17,14 @@
 package org.zanata.zanatareposync;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
 import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.QueryParameter;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import hudson.Extension;
@@ -34,6 +35,7 @@ import hudson.tools.ToolDescriptor;
 import hudson.tools.ToolInstallation;
 import hudson.tools.ToolInstaller;
 import hudson.tools.ZipExtractionInstaller;
+import hudson.util.FormValidation;
 
 /**
  * Add zanata CLI to the node.
@@ -51,7 +53,7 @@ public class ZanataCLIInstall extends ToolInstallation implements
     @DataBoundConstructor
     public ZanataCLIInstall(@Nonnull String home, @Nonnull String version,
             @CheckForNull List properties) {
-        super("Zanana_cli_" + dotToUnderscore(version), home, properties);
+        super("zanata_cli_" + dotToUnderscore(version), home, properties);
         this.version = version;
     }
 
@@ -59,7 +61,7 @@ public class ZanataCLIInstall extends ToolInstallation implements
         if (Strings.isNullOrEmpty(version)) {
             return version;
         }
-        return version.replaceAll("\\.", "_");
+        return version.replaceAll("\\.|-", "_");
     }
 
     public String getVersion() {
@@ -103,6 +105,18 @@ public class ZanataCLIInstall extends ToolInstallation implements
                 }
             }
             return null;
+        }
+
+        @SuppressWarnings("unused")
+        public FormValidation doCheckVersion(@QueryParameter String version) {
+            if (Strings.isNullOrEmpty(version)) {
+                return FormValidation.error("Please enter a version to distinguish this Zanata CLI installation from others");
+            }
+            if (version.matches("[0-9\\.\\-a-zA-Z_]+")) {
+                return FormValidation.ok();
+            } else {
+                return FormValidation.warning("Please only enter alphanumeric, dot, dash and underscore");
+            }
         }
 
         @Override
