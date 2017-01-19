@@ -97,7 +97,7 @@ public class ZanataCLIInstallWrapper extends BuildWrapper {
     public Environment setUp(AbstractBuild build, Launcher launcher,
             BuildListener listener) throws IOException, InterruptedException {
 
-        final EnvVars buildEnv = build.getEnvironment(listener);
+//        final EnvVars buildEnv = build.getEnvironment(listener);
         final Node node = build.getBuiltOn();
 
         return new Environment() {
@@ -124,7 +124,7 @@ public class ZanataCLIInstallWrapper extends BuildWrapper {
             BuildListener listener) throws IOException, InterruptedException,
             RunnerAbortedException {
 
-        EnvVars buildEnv = build.getEnvironment(listener);
+//        EnvVars buildEnv = build.getEnvironment(listener);
         final EnvVars homes = new EnvVars();
 
         // Each tool can export zero or many directories to the PATH

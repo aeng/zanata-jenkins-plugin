@@ -20,6 +20,7 @@
  */
 package org.jenkinsci.plugins.zanata.cli.service;
 
+import java.io.Serializable;
 import java.nio.file.Path;
 
 import org.zanata.client.commands.pull.PullOptions;
@@ -29,7 +30,7 @@ import org.jenkinsci.plugins.zanata.exception.ZanataSyncException;
 /**
  * @author Patrick Huang <a href="mailto:pahuang@redhat.com">pahuang@redhat.com</a>
  */
-public interface ZanataSyncService {
+public interface ZanataSyncService extends Serializable {
 
     PullOptions getPullOptions();
 

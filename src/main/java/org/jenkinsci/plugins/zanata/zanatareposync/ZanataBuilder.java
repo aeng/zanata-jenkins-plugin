@@ -30,6 +30,7 @@ import com.cloudbees.plugins.credentials.common.StandardUsernameListBoxModel;
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import com.google.common.base.Strings;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import hudson.AbortException;
 import hudson.EnvVars;
 import hudson.Extension;
@@ -205,19 +206,17 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
         }
     }
 
-    private static Handler configLogger(PrintStream logger) {
-        java.util.logging.Logger zLogger =
-                java.util.logging.Logger.getLogger("org.zanata");
-        ZanataCLILoggerHandler appender =
-                new ZanataCLILoggerHandler(logger);
-        zLogger.addHandler(appender);
-        return appender;
+    @SuppressFBWarnings("LG_LOST_LOGGER_DUE_TO_WEAK_REFERENCE")
+    private static Handler configLogger(PrintStream printStream) {
+        ZanataCLILoggerHandler loggerHandler =
+                new ZanataCLILoggerHandler(printStream);
+
+        java.util.logging.Logger.getLogger("org.zanata").addHandler(loggerHandler);
+        return loggerHandler;
     }
 
     private static void removeLogger(Handler appender) {
-        java.util.logging.Logger zLogger =
-                java.util.logging.Logger.getLogger("org.zanata");
-        zLogger.removeHandler(appender);
+        java.util.logging.Logger.getLogger("org.zanata").removeHandler(appender);
     }
 
     private static void pullFromZanata(FilePath workspace,
@@ -378,6 +377,7 @@ public class ZanataBuilder extends Builder implements SimpleBuildStep {
             if (!Strings.isNullOrEmpty(value) && value.trim().length() > 0) {
                 try {
                     URL url = new URL(value);
+                    log.trace("url from UI: {}", url);
                 } catch (MalformedURLException e) {
                     return FormValidation.error("Not a valid URL");
                 }

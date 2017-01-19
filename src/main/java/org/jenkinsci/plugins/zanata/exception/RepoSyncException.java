@@ -1,4 +1,4 @@
-package org.jenkinsci.plugins.zanata.git;
+package org.jenkinsci.plugins.zanata.exception;
 
 /**
  * @author Patrick Huang <a href="mailto:pahuang@redhat.com">pahuang@redhat.com</a>

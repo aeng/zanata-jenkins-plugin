@@ -20,9 +20,11 @@
  */
 package org.jenkinsci.plugins.zanata.cli.service;
 
+import java.io.Serializable;
+
 import org.zanata.client.commands.push.PushOptions;
 
-public interface PushService {
+public interface PushService extends Serializable {
 
     void pushToZanata(PushOptions pushOptions);
 }

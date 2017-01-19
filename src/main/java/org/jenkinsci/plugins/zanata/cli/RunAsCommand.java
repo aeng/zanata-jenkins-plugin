@@ -54,7 +54,7 @@ public class RunAsCommand {
             }
 
             baos.flush();
-            listener.getLogger().print(baos.toString());
+            listener.getLogger().print(baos.toString("UTF-8"));
             listener.getLogger().flush();
             return child.join() == 0;
         } catch (IOException e) {

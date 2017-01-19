@@ -20,9 +20,12 @@
  */
 package org.jenkinsci.plugins.zanata.git;
 
+import java.io.Serializable;
 import java.nio.file.Path;
 
-public interface RepoSyncService {
+import org.jenkinsci.plugins.zanata.exception.RepoSyncException;
+
+public interface RepoSyncService extends Serializable {
 
     void syncTranslationToRepo(Path path)
             throws RepoSyncException;

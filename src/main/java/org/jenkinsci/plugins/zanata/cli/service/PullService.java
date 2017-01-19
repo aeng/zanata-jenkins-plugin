@@ -20,12 +20,14 @@
  */
 package org.jenkinsci.plugins.zanata.cli.service;
 
+import java.io.Serializable;
+
 import org.zanata.client.commands.pull.PullOptions;
 
 /**
  * @author Patrick Huang <a href="mailto:pahuang@redhat.com">pahuang@redhat.com</a>
  */
-public interface PullService {
+public interface PullService extends Serializable {
 
     void pullFromZanata(PullOptions pullOptions);
 

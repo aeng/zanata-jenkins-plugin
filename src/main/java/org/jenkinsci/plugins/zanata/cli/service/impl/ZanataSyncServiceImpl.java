@@ -21,6 +21,7 @@
 package org.jenkinsci.plugins.zanata.cli.service.impl;
 
 import java.io.File;
+import java.io.Serializable;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Path;
@@ -48,11 +49,13 @@ import com.google.common.collect.ImmutableSet;
  * @author Patrick Huang <a href="mailto:pahuang@redhat.com">pahuang@redhat.com</a>
  */
 public class ZanataSyncServiceImpl implements ZanataSyncService {
+
     private static final Logger log =
             LoggerFactory.getLogger(ZanataSyncServiceImpl.class);
+    private static final long serialVersionUID = 1L;
 
-    private final PullOptions pullOptions;
-    private final PushOptions pushOptions;
+    private final transient PullOptions pullOptions;
+    private final transient PushOptions pushOptions;
 
     private final PushServiceImpl pushService = new PushServiceImpl();
     private final PullServiceImpl pullService = new PullServiceImpl();
@@ -91,11 +94,11 @@ public class ZanataSyncServiceImpl implements ZanataSyncService {
             pushOptions.setLocales(localeId);
         }
         // if project id is given, only handle this project
-        String projectId = jobDetail.getProject();
-        if (!Strings.isNullOrEmpty(projectId)) {
-            pullOptions.setProj(projectId);
-            pushOptions.setProj(projectId);
-        }
+//        String projectId = jobDetail.getProject();
+//        if (!Strings.isNullOrEmpty(projectId)) {
+//            pullOptions.setProj(projectId);
+//            pushOptions.setProj(projectId);
+//        }
 
     }
 

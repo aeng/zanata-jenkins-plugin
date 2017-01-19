@@ -3,12 +3,14 @@ package org.jenkinsci.plugins.zanata.zanatareposync;
 import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition;
 import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 import org.jenkinsci.plugins.workflow.job.WorkflowRun;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.jvnet.hudson.test.JenkinsRule;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 
+@Ignore
 public class ZanataStepTest {
     @Rule
     public JenkinsRule j = new JenkinsRule();

@@ -20,6 +20,8 @@
  */
 package org.jenkinsci.plugins.zanata.cli;
 
+import java.io.Serializable;
+
 import com.google.common.base.MoreObjects;
 
 
@@ -27,7 +29,7 @@ import com.google.common.base.MoreObjects;
  * DTO for everything a sync job requires.
  * @author Patrick Huang <a href="mailto:pahuang@redhat.com">pahuang@redhat.com</a>
  */
-public class SyncJobDetail {
+public class SyncJobDetail implements Serializable {
     private String srcRepoUrl;
     private String srcRepoUsername;
     private String srcRepoSecret;
@@ -46,7 +48,6 @@ public class SyncJobDetail {
     private String projectConfigs;
 
     private String initiatedFromHostURL;
-    private String project;
 
     public String getSrcRepoUrl() {
         return srcRepoUrl;
@@ -96,10 +97,6 @@ public class SyncJobDetail {
         return initiatedFromHostURL;
     }
 
-    public String getProject() {
-        return project;
-    }
-
     @Override
     public String toString() {
         return MoreObjects.toStringHelper(this)
@@ -113,14 +110,12 @@ public class SyncJobDetail {
 //                .add("zanataSecret", mask(zanataSecret))
                 .add("syncToZanataOption", syncToZanataOption)
                 .add("localeId", localeId)
-                .add("project", project)
                 .add("projectConfigs", projectConfigs)
                 .toString();
     }
 
     public static class Builder {
         private final SyncJobDetail syncJobDetail;
-        private String project;
 
         private Builder(SyncJobDetail syncJobDetail) {
             this.syncJobDetail = syncJobDetail;
@@ -193,15 +188,6 @@ public class SyncJobDetail {
 
         public SyncJobDetail build() {
             return syncJobDetail;
-        }
-
-        public Builder setProject(String project) {
-            syncJobDetail.project = project;
-            return this;
-        }
-
-        public String getProject() {
-            return project;
         }
     }
 }
